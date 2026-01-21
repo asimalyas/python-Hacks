@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>📸 OCR Web App</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: linear-gradient(to right, #6a11cb, #2575fc);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 20px; font-size: 2.2rem; text-shadow: 2px 2px 5px rgba(0,0,0,0.3); }
+
+    #drop-area {
+      border: 3px dashed #fff;
+      border-radius: 15px;
+      width: 400px;
+      height: 250px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 20px;
+      transition: background 0.3s, border-color 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #drop-area.hover { background: rgba(255,255,255,0.1); border-color: #ffeb3b; }
+
+    #drop-area img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    input[type="file"] { display: none; }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background-color: #ffeb3b;
+      color: #333;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    button:hover { background-color: #fdd835; }
+
+    #progress { margin-top: 10px; font-weight: bold; }
+    textarea {
+      width: 80%;
+      height: 200px;
+      margin-top: 20px;
+      font-size: 16px;
+      border-radius: 10px;
+      padding: 10px;
+      resize: none;
+      border: none;
+    }
+    #copy-btn { background-color: #00e676; color: #333; }
+    #copy-btn:hover { background-color: #00c853; }
+  </style>
+</head>
+<body>
+
+<h1>📸 OCR Web App</h1>
+
+<div id="drop-area">
+  Drag & Drop an image here, <label for="imageInput" style="cursor:pointer; text-decoration: underline; color: #fff;">browse</label>, or paste (Ctrl+V)
+  <input type="file" id="imageInput" accept="image/*">
+  <img id="preview" src="" alt="" style="display:none;">
+</div>
+
+<button onclick="performOCR()">Extract Text</button>
+<button id="copy-btn" onclick="copyText()">Copy Text</button>
+
+<div id="progress"></div>
+<textarea id="output" placeholder="Extracted text will appear here..." readonly></textarea>
+
+<script>
+let currentFile = null;
+const dropArea = document.getElementById('drop-area');
+const input = document.getElementById('imageInput');
+const preview = document.getElementById('preview');
+
+function showPreview(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag & Drop
+dropArea.addEventListener('dragover', (e) => { e.preventDefault(); dropArea.classList.add('hover'); });
+dropArea.addEventListener('dragleave', (e) => { dropArea.classList.remove('hover'); });
+dropArea.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropArea.classList.remove('hover');
+  input.files = e.dataTransfer.files;
+  currentFile = input.files[0];
+  showPreview(currentFile);
+});
+
+// Browse
+input.addEventListener('change', () => {
+  currentFile = input.files[0];
+  showPreview(currentFile);
+});
+
+// Paste from clipboard
+document.addEventListener('paste', (e) => {
+  const items = e.clipboardData.items;
+  for (let i=0; i<items.length; i++) {
+    if (items[i].type.indexOf("image") !== -1) {
+      const blob = items[i].getAsFile();
+      currentFile = blob;
+      showPreview(currentFile);
+      alert("📋 Image pasted from clipboard!");
+    }
+  }
+});
+
+// OCR
+function performOCR() {
+  if (!currentFile) { alert('Please select, drag, or paste an image first!'); return; }
+
+  const output = document.getElementById('output');
+  const progress = document.getElementById('progress');
+  output.value = '';
+  progress.textContent = '⏳ Processing...';
+
+  Tesseract.recognize(
+    currentFile,
+    'eng',
+    {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          progress.textContent = `🖊 Recognizing text: ${Math.round(m.progress * 100)}%`;
+        }
+      }
+    }
+  ).then(({ data: { text } }) => {
+    output.value = text;
+    progress.textContent = '✅ Done!';
+  }).catch(err => {
+    console.error(err);
+    progress.textContent = '❌ Error during OCR';
+  });
+}
+
+// Copy text
+function copyText() {
+  const output = document.getElementById('output');
+  output.select();
+  document.execCommand('copy');
+  alert('Text copied to clipboard!');
+}
+</script>
+
+</body>
+</html>
